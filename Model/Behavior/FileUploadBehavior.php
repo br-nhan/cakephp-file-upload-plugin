@@ -74,17 +74,20 @@ class FileUploadBehavior extends ModelBehavior {
      */
     public function beforeSave(Model $Model, $options = array()) {
         extract($this->settings[$Model->alias]);
-        
-        $value = isset($Model->data[$Model->alias][$field])?$Model->data[$Model->alias][$field]:null;
-        
-        if (!empty($value['tmp_name'])) {
-            $Model->data[$Model->alias][$field] = $this->moveUploadedFile($Model, $value);
-        }
-        else {
-            if (!$required) {
-                unset($Model->data[$Model->alias][$field]);
+        if(!empty($Model->data[$Model->alias][$field])){
+            $value = $Model->data[$Model->alias][$field];
+
+            if (!empty($value['tmp_name'])) {
+                $Model->data[$Model->alias][$field] = $this->moveUploadedFile($Model, $value);
+            }
+            else {
+                if (!$required) {
+                    unset($Model->data[$Model->alias][$field]);
+                }
             }
         }
+
+        
         return true;
     }
     
@@ -124,9 +127,9 @@ class FileUploadBehavior extends ModelBehavior {
     private function moveUploadedFile(Model $Model, $file) {
         extract($this->settings[$Model->alias]);
         
-        $filename = $Model->generateFilename($Model->data[$Model->alias]);
+        $filename = $uploadDir . $Model->generateFilename($Model->data[$Model->alias]);
         $source = $file['tmp_name'];
-        $destination = WWW_ROOT . $uploadDir . $filename;
+        $destination = WWW_ROOT . $filename;
         
         if (!move_uploaded_file($source, $destination)) {
             throw new CakeException( __('Error moving file'));
