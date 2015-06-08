@@ -75,7 +75,7 @@ class FileUploadBehavior extends ModelBehavior {
     public function beforeSave(Model $Model, $options = array()) {
         extract($this->settings[$Model->alias]);
         
-        $value = $Model->data[$Model->alias][$field];
+        $value = isset($Model->data[$Model->alias][$field])?$Model->data[$Model->alias][$field]:null;
         
         if (!empty($value['tmp_name'])) {
             $Model->data[$Model->alias][$field] = $this->moveUploadedFile($Model, $value);
