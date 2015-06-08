@@ -85,7 +85,6 @@ class FileUploadBehavior extends ModelBehavior {
                 unset($Model->data[$Model->alias][$field]);
             }
         }
-        
         return true;
     }
     
