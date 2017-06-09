@@ -32,10 +32,12 @@ class FileUploadBehavior extends ModelBehavior {
     public function setup(Model $Model, $settings = array()) {
         if (!isset($this->settings[$Model->alias])) {
             $this->settings[$Model->alias] = array(
-                'allowedExtensions' => array('gif', 'jpeg', 'jpg', 'png'),
-                'field' => 'image',
-                'required' => true,
-                'uploadDir' => 'files' . DS
+                'image' => [
+                    'allowedExtensions' => array('gif', 'jpeg', 'jpg', 'png'),
+                    'required' => true,
+                    'uploadDir' => 'files' . DS
+                ]
+
             );
         }
         $this->settings[$Model->alias] = array_merge($this->settings[$Model->alias], $settings);
@@ -49,18 +51,19 @@ class FileUploadBehavior extends ModelBehavior {
      * @return boolean
      */
     public function beforeValidate(Model $Model, $options = array()) {
-        extract($this->settings[$Model->alias]);
-        
-        if ($required) {
-            $Model->validator()->add($field, 'extension', array(
-                'rule' => array('extension', $allowedExtensions),
-                'message' => __('Please supply a valid file')
-            ));
-            $Model->validator()->add($field, 'uploadError', array(
-                'rule' => 'uploadError',
-                'message' => __('Something went wrong with the upload')
-            ));
+        foreach ($this->settings[$Model->alias] as $field => $setting){
+            if ($setting['required']) {
+                $Model->validator()->add($field, 'extension', array(
+                    'rule' => array('extension', $setting['allowedExtensions']),
+                    'message' => __('Please supply a valid file')
+                ));
+                $Model->validator()->add($field, 'uploadError', array(
+                    'rule' => 'uploadError',
+                    'message' => __('Something went wrong with the upload')
+                ));
+            }
         }
+
         
         return true;
     }
@@ -73,16 +76,17 @@ class FileUploadBehavior extends ModelBehavior {
      * @param boolean
      */
     public function beforeSave(Model $Model, $options = array()) {
-        extract($this->settings[$Model->alias]);
-        if(!empty($Model->data[$Model->alias][$field])){
-            $value = $Model->data[$Model->alias][$field];
+        foreach ($this->settings[$Model->alias] as $field => $setting) {
 
-            if (!empty($value['tmp_name'])) {
-                $Model->data[$Model->alias][$field] = $this->moveUploadedFile($Model, $value);
-            }
-            else {
-                if (!$required) {
-                    unset($Model->data[$Model->alias][$field]);
+            if (!empty($Model->data[$Model->alias][$field])) {
+                $value = $Model->data[$Model->alias][$field];
+
+                if (!empty($value['tmp_name'])) {
+                    $Model->data[$Model->alias][$field] = $this->moveUploadedFile($Model, $field, $value);
+                } else {
+                    if (!$setting['required']) {
+                        unset($Model->data[$Model->alias][$field]);
+                    }
                 }
             }
         }
@@ -99,7 +103,11 @@ class FileUploadBehavior extends ModelBehavior {
      * @return boolean
      */
     public function beforeDelete(Model $Model, $cascade = true) {
-        $this->filename = $Model->field($this->settings[$Model->alias]['field']);
+        $this->filenames = [];
+        foreach ($this->settings[$Model->alias] as $field => $setting){
+            $this->filenames[$field] = WWW_ROOT . $setting['uploadDir'] . $Model->field($field);
+        }
+
         
         return true;
     }
@@ -111,10 +119,11 @@ class FileUploadBehavior extends ModelBehavior {
      * @return void
      */
     public function afterDelete(Model $Model) {
-        $path = WWW_ROOT . $this->settings[$Model->alias]['uploadDir'] . $this->filename;
-        
-        $file = new File($path);
-        $file->delete();
+        foreach ($this->filenames as $file){
+            $file = new File($file);
+            $file->delete();
+        }
+
     }
     
     /**
@@ -124,17 +133,17 @@ class FileUploadBehavior extends ModelBehavior {
      * @param array $file
      * @return string
      */
-    private function moveUploadedFile(Model $Model, $file) {
-        extract($this->settings[$Model->alias]);
-        
-        $filename = $uploadDir . $Model->generateFilename($Model->data[$Model->alias]);
+    private function moveUploadedFile(Model $Model, $field, $file) {
+        $setting = $this->settings[$Model->alias][$field];
+
+        $filename = $setting['uploadDir'] . $Model->generateFilename($Model->data[$Model->alias], $field);
         $source = $file['tmp_name'];
         $destination = WWW_ROOT . $filename;
-        
+
         if (!move_uploaded_file($source, $destination)) {
             throw new CakeException( __('Error moving file'));
         }
-        
+
         return $filename;
     }
 }
